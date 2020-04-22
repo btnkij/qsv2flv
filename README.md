@@ -45,7 +45,7 @@ _由于可能的QSV版本更新、分析的QSV文件不具有代表性和本人�
 
 #### 视频数据
 
-本节紧接“文件信息”节之后，是分段的FLV编码的视频数据，每段6分钟。每段开头为一个ScriptTag，前1024字节经加密处理，末尾的PreTagSize总是比该Tag的实际长度少0xD。ScriptTag后紧接着一个VideoTag和一个AudioTag，Timestamp总是为0。后面Tag的Timestamp从上一段最后一个Tag是Timestamp算起。
+本节紧接“文件信息”节之后，是分段的FLV编码的视频数据，每段6分钟。每段开头为一个ScriptTag，前1024字节经加密处理，末尾的PreTagSize总是比该Tag的实际长度少0xD。ScriptTag后紧接着一个VideoTag和一个AudioTag，Timestamp总是为0。后面Tag的Timestamp从上一段最后一个Tag的Timestamp算起。
 
 FLV格式请参考[Adobe官网文档](https://www.adobe.com/content/dam/acom/en/devnet/flv/video_file_format_spec_v10_1.pdf)。
 
