@@ -1,5 +1,7 @@
 ### 说明
 
+一句话简介：将某奇艺自家的QSV格式的视频转码为FLV格式的视频。
+
 该分支为废弃的老版本，存在较多问题，最新版本见[main分支](https://github.com/btnkij/qsv2flv/tree/main)。
 
 
