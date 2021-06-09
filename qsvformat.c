@@ -1,3 +1,14 @@
+/**
+*
+* description: an example for parsing qsv
+* author: btnkij
+*
+* the qsv format is extracted from GeePlayer 5.2.61.5220 (Jan 21, 2020)
+* algorithm may fail in the future
+*
+**/
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -7,16 +18,11 @@ typedef uint16_t WORD;
 typedef uint32_t DWORD;
 typedef uint64_t QWORD;
 
-#pragma pack(1)
-typedef struct {
-	BYTE _codetable[0x10];
-	QWORD flv_offset;
-	DWORD flv_size;
-} QSV_INDEX;
+#define QSV_ENCRYPTED_SIZE 0x400
 
 #pragma pack(1)
 typedef struct {
-	BYTE magic[0xA];
+	BYTE signature[0xA];
 	DWORD version;
 	BYTE vid[0x10];
 	DWORD _unknown1;
@@ -26,32 +32,38 @@ typedef struct {
 	QWORD xml_offset;
 	DWORD xml_size;
 	DWORD nb_indices;
-	BYTE* _unknown5;
-	QSV_INDEX* indices;
-} QSV_HEADER;
+} QsvHeader;
 
+#pragma pack(1)
+typedef struct {
+	BYTE _codetable[0x10];
+	QWORD segment_offset;
+	DWORD segment_size;
+} QsvIndex;
+
+// decryption algorithm for some segments in qsv version 0x1
 void decrypt_1(BYTE* buffer, DWORD size) {
 	static BYTE dict[] = {0x62, 0x67, 0x70, 0x79};
-	for(int eax = 0; eax < size; ++eax) {
-		DWORD edx = ~eax & 0x3;
-		buffer[eax] ^= dict[edx];
+	for(int i = 0; i < size; ++i) {
+		DWORD j = ~i & 0x3;
+		buffer[i] ^= dict[j];
 	}
 }
 
+// decryption algorithm for some segments in qsv version 0x2
 void decrypt_2(BYTE* buffer, DWORD size) {
-	DWORD ecx = 0x62677079U;
-	for(DWORD eax = size - 1; eax != 0; --eax) {
-		ecx = (ecx << 1) | (ecx >> 31);
-		ecx ^= buffer[eax];
+	DWORD x = 0x62677079;
+	for(DWORD i = size - 1; i != 0; --i) {
+		x = (x << 1) | (x >> 31);
+		x ^= buffer[i];
 	}
-	for(DWORD ebx = 1; ebx < size; ++ebx) {
-		DWORD eax = buffer[ebx] & 0xFF;
-		ecx ^= eax;
-		ecx = (ecx >> 1) | (ecx << 31);
-		DWORD k = ecx % ebx;
-		BYTE al = buffer[k];
-		buffer[k] = al ^ (BYTE)~buffer[ebx];
-		buffer[ebx] = al;
+	for(DWORD i = 1; i < size; ++i) {
+		x ^= buffer[i] & 0xFF;
+		x = (x >> 1) | (x << 31);
+		DWORD j = x % i;
+		BYTE tmp = buffer[j];
+		buffer[j] = tmp ^ (BYTE)~buffer[i];
+		buffer[i] = tmp;
 	}
 }
 
@@ -71,15 +83,16 @@ void print_chars(BYTE* buffer, DWORD size) {
 }
 
 int main(int argc, char** argv) {
+	// input the qsv file name as the first parameter
+	// or assign the following variable directly
 	char* filename = argv[1];
 	FILE* fp = fopen(filename, "rb");
 
-	QSV_HEADER qheader;
-
-	fread(&qheader, 1, sizeof(qheader) - sizeof(qheader._unknown5) - sizeof(qheader.indices), fp);
-	printf("\n### header\n");
-	printf("magic: ");
-	print_chars(qheader.magic, sizeof(qheader.magic));
+	QsvHeader qheader;
+	fread(&qheader, sizeof(qheader), 1, fp);
+	printf("\n# header\n");
+	printf("signature: ");
+	print_chars(qheader.signature, sizeof(qheader.signature));
 	printf("version: 0x%X\n", qheader.version);
 	printf("vid: ");
 	for(int i = 0; i < sizeof(qheader.vid); ++i) {
@@ -90,47 +103,55 @@ int main(int argc, char** argv) {
 	printf("xml_size: 0x%X\n", qheader.xml_size);
 	printf("nb_indices: 0x%X\n", qheader.nb_indices);
 
-	DWORD _unknown5_size = (qheader.nb_indices + 7) >> 3;
-	qheader._unknown5 = (BYTE*)malloc(_unknown5_size);
-	fread(qheader._unknown5, 1, _unknown5_size, fp);
-
-	printf("\n### indices\n");
-	qheader.indices = (QSV_INDEX*)malloc(qheader.nb_indices * sizeof(QSV_INDEX));
-	fread(qheader.indices, 1, qheader.nb_indices * sizeof(QSV_INDEX), fp);
-	// print_bytes((BYTE*)qheader.indices, 0x1C * 3);
+	printf("\n# indices\n");
+	DWORD index_flags_size = (qheader.nb_indices + 7) >> 3;
+	BYTE* index_flags = (BYTE*)malloc(index_flags_size);
+	fread(index_flags, index_flags_size, 1, fp);
+	QsvIndex* qindices = (QsvIndex*)malloc(qheader.nb_indices * sizeof(QsvIndex));
+	fread(qindices, sizeof(QsvIndex), qheader.nb_indices, fp);
 	for(int i = 0; i < qheader.nb_indices; ++i) {
-		QSV_INDEX* qindex = qheader.indices + i;
-		decrypt_2((BYTE*)qindex, sizeof(QSV_INDEX));
-		printf("flv_offset: 0x%llX, flv_size: 0x%X\n", qindex->flv_offset, qindex->flv_size);
+		QsvIndex* qindex = qindices + i;
+		if(qheader.version == 0x2) {
+			decrypt_2((BYTE*)qindex, sizeof(QsvIndex));
+		}
+		printf("flag: %X", (index_flags[i >> 3] >> (i & 0x7)) & 1);
+		printf(", offset: 0x%X", qindex->segment_offset);
+		printf(", size: 0x%X\n", qindex->segment_size);
 	}
-	// print_bytes((BYTE*)qheader.indices, 0x1C * 3);
+	free(index_flags);
+	index_flags = NULL;
 
-	printf("\n### xml\n");
+	printf("\n# xml\n");
 	BYTE* xml = (BYTE*)malloc(qheader.xml_size);
 	fseek(fp, qheader.xml_offset, SEEK_SET);
-	fread(xml, 1, qheader.xml_size, fp);
+	fread(xml, qheader.xml_size, 1, fp);
 	decrypt_1(xml, qheader.xml_size);
 	print_chars(xml, qheader.xml_size);
+	free(xml);
+	xml = NULL;
 
-	printf("\n### flv\n");
-	const DWORD LEN_ENCRYPTED_SEGMENT = 0x400;
-	BYTE* flv = (BYTE*)malloc(LEN_ENCRYPTED_SEGMENT);
+	printf("\n# segments\n");
+	BYTE* buffer = (BYTE*)malloc(QSV_ENCRYPTED_SIZE);
 	for(int i = 0; i < qheader.nb_indices; ++i) {
-		printf("# section %d\n", i);
-		fseek(fp, qheader.indices[i].flv_offset, SEEK_SET);
-		fread(flv, 1, LEN_ENCRYPTED_SEGMENT, fp);
-		decrypt_2(flv, LEN_ENCRYPTED_SEGMENT);
-		print_chars(flv, LEN_ENCRYPTED_SEGMENT);
+		printf("### segment %d\n", i);
+		QsvIndex* qindex = qindices + i;
+		fseek(fp, qindex->segment_offset, SEEK_SET);
+		printf("%X\n", qindex->segment_offset);
+		fread(buffer, QSV_ENCRYPTED_SIZE, 1, fp);
+		if(qheader.version == 0x1) {
+			decrypt_1(buffer, QSV_ENCRYPTED_SIZE);
+		} else if(qheader.version == 0x2) {
+			decrypt_2(buffer, QSV_ENCRYPTED_SIZE);
+		}
+		print_chars(buffer, QSV_ENCRYPTED_SIZE);
 		printf("\n");
 	}
-	free(flv);
-	flv = NULL;
+	free(qindices);
+	qindices = NULL;
+	free(buffer);
+	buffer = NULL;
 
 	fclose(fp);
-	free(qheader._unknown5);
-	qheader._unknown5 = NULL;
-	free(qheader.indices);
-	qheader.indices = NULL;
 
 	return 0;
 }
