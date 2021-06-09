@@ -1,36 +1,35 @@
-## 简介
+## 计划实现功能
 
 ~~将.qsv格式的视频转码为.flv格式。~~
+
+由于qy客户端的更新，本项目的定位为：将qsv格式转换为常用视频格式，不限于flv。
 
 
 
 ## 闲话
 
-由于以前C#版本的代码过于丑陋，且存在部分文件转码失败的情况，该版本将被废弃，见[obsolete](https://github.com/btnkij/qsv2flv/tree/obsolete)分支。当前分支下的代码将使用C重写，计划为控制台程序，暂时不打算提供UI界面。
+由于以前C#版本的代码过于丑陋，且存在部分文件转码失败的情况，该版本将被废弃，见[obsolete](https://github.com/btnkij/qsv2flv/tree/obsolete)分支。当前分支下的代码将使用C++重写。
 
-该项目正在进行中，目前仅可以转换使用旧客户端下载的视频。[qsvformat.c](https://github.com/btnkij/qsv2flv/blob/main/qsvformat.c)是一个演示转码原理的demo程序，可以提取视频分段的数据。从旧版本的文件中可以提取到flv格式的数据，简单合并即可完成转码。（新版本的文件中提取到的为ts格式的数据，因此简介被划掉了😑）
+该项目正在进行中。
 
+**qsvformat.c** ：已完成。用于格式说明的demo程序。
 
+**qsvunpack.c** ：基本完成（可编译运行），目前能够提取qsv文件中的flv视频和ts视频，提取的视频能够播放。
 
-## 编译命令
-
-```bash
-gcc qsv2flv.c -o qsv2flv.exe -O2
-```
+**GUI** ：计划中，整合前面的算法，提供完整的转码流程。
 
 
 
 ## 使用方式
 
+编译
 ```bash
-qsv2flv.exe input_file_name output_file_name
+gcc qsvunpack.c -o qsvunpack.exe -O2
 ```
 
+运行（仅提取分段视频）
+```bash
+qsvunpack.exe input_file_name output_file_name
+```
 
-
-## 目录结构
-
-* qsv2flv.c ：转码入口程序。
-* yamdi.h ：拷贝自[ioppermann/yamdi: Yet Another MetaData Injector for FLV (github.com)](https://github.com/ioppermann/yamdi)，用于注入flv格式视频的metadata信息。
-* qsvformat.c ：用于格式说明的demo程序。
-
+暂未提供完整的转码程序。
