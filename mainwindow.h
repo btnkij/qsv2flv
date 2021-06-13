@@ -2,13 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-
-extern "C" {
-   #include "libavcodec/avcodec.h"
-   #include "libavformat/avformat.h"
-   #include "libswscale/swscale.h"
-   #include "libavdevice/avdevice.h"
-}
+#include "converter.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -25,7 +19,16 @@ public:
 private slots:
     void on_pushButton_clicked();
 
+    void on_btnSelectOutputPath_clicked();
+
+    void on_btnAppendFiles_clicked();
+
+    void conversionFinished();
+
+    void conversionDestroyed();
+
 private:
     Ui::MainWindow *ui;
+    ConverterThread *converterThread;
 };
 #endif // MAINWINDOW_H
