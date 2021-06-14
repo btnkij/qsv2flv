@@ -70,9 +70,11 @@ public:
 
     int get_nb_indices() const;
 
-    void init_read();
+    void seek_to_segment(int idx);
 
     int read_bytes(BYTE* buffer, int query_size);
+
+    void init_progress();
 
     float get_progress() const;
 };

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <QFile>
+#include <QDebug>
 #include "qsvreader.h"
 
 
@@ -118,51 +119,44 @@ int QsvUnpacker::get_nb_indices() const {
     return nb_indices;
 }
 
-void QsvUnpacker::init_read() {
-    read_index = 0;
+void QsvUnpacker::seek_to_segment(int idx) {
+    read_index = idx;
     read_offset = 0;
+    infile->seek(qindices[read_index].segment_offset);
+}
+
+int QsvUnpacker::read_bytes(BYTE* buffer, int read_size) {
+    errcode = 0;
+    if((DWORD)(read_offset + read_size) > qindices[read_index].segment_size) {
+        read_size = qindices[read_index].segment_size - read_offset;
+    }
+    if(read_size == 0) {
+        return -1; // end of file
+    }
+    read_size = infile->read((char*)buffer, read_size);
+    if(read_size <= 0) {
+        errcode = -1;
+        msg = "文件不完整";
+        return -1;
+    }
+    if(read_offset == 0) {
+        if(version == 1) {
+            decrypt_1(buffer, QSV_SIZE_ENCRYPTED);
+        } else if(version == 2) {
+            decrypt_2(buffer, QSV_SIZE_ENCRYPTED);
+        }
+    }
+    read_offset += read_size;
+    processed_size += read_size;
+    return read_size;
+}
+
+void QsvUnpacker::init_progress() {
     total_size = 0;
     for(int i = 0; i < nb_indices; ++i) {
         total_size += qindices[i].segment_size;
     }
     processed_size = 0;
-    infile->seek(qindices[read_index].segment_offset);
-}
-
-int QsvUnpacker::read_bytes(BYTE* buffer, int query_size) {
-    int total_read_size = 0;
-    while(total_read_size < query_size && read_index < nb_indices) {
-        int read_size = query_size - total_read_size;
-        if((DWORD)(read_offset + read_size) > qindices[read_index].segment_size) {
-            read_size = qindices[read_index].segment_size - read_offset;
-        }
-        if(read_size == 0) {
-            ++read_index;
-            read_offset = 0;
-            if(read_index < nb_indices) {
-                infile->seek(qindices[read_index].segment_offset);
-            }
-            continue;
-        }
-        if(read_offset == 0 && read_size < QSV_SIZE_ENCRYPTED) {
-            break; // no enough bytes to decryte
-        }
-        read_size = infile->read((char*)buffer + total_read_size, read_size);
-        if(read_size <= 0) {
-            break; // error
-        }
-        if(read_offset == 0) {
-            if(version == 1) {
-                decrypt_1(buffer + total_read_size, QSV_SIZE_ENCRYPTED);
-            } else if(version == 2) {
-                decrypt_2(buffer + total_read_size, QSV_SIZE_ENCRYPTED);
-            }
-        }
-        total_read_size += read_size;
-        read_offset += read_size;
-        processed_size += read_size;
-    }
-    return total_read_size == 0 ? -1 : total_read_size;
 }
 
 float QsvUnpacker::get_progress() const {
