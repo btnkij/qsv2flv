@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QFileInfo>
 
 
 class InputFileModel {
@@ -13,14 +14,18 @@ public:
         STATUS_FAILED
     };
 private:
-    QString inputPath;
+    QFileInfo info;
     FileStatus statusCode;
     QString statusMsg;
     float progress;
 public:
     InputFileModel(const QString& path);
 
-    const QString& getInputPath() const;
+    QString getFilePath() const;
+
+    QString getFileBaseName() const;
+
+    QString getFileName() const;
 
     FileStatus getStatusCode() const;
 

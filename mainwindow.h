@@ -17,15 +17,19 @@ public:
     ~MainWindow();
 
 private slots:
-    void on_pushButton_clicked();
-
     void on_btnSelectOutputPath_clicked();
 
     void on_btnAppendFiles_clicked();
 
-    void conversionFinished();
-
     void conversionDestroyed();
+
+    void on_btnConvert_clicked();
+
+    void on_btnRemoveFile_clicked();
+
+    void on_btnClearList_clicked();
+
+    void on_cbxTargetFormat_currentIndexChanged(int index);
 
 private:
     Ui::MainWindow *ui;

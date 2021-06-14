@@ -32,8 +32,9 @@ void ConverterThread::convertSingleFile() {
     curFile->setProgress(0);
     emit fileStatusChanged(curRowIndex);
 
-    QString inputPath = curFile->getInputPath();
-    QString outputPath = dataModel->getOutputPath(inputPath);
+    QString inputPath = curFile->getFilePath();
+    QString outputName = curFile->getFileBaseName() + dataModel->getTargetFormat();
+    QString outputPath = dataModel->getOutputDir().absoluteFilePath(outputName);
 
     QsvUnpacker unpacker(inputPath);
     if(unpacker.get_errcode() != 0) {
@@ -47,6 +48,7 @@ void ConverterThread::convertSingleFile() {
     AVFormatContext* outCtx = nullptr;
 
     for(int i = 0; i < unpacker.get_nb_indices(); ++i) {
+//        qDebug() << "segment" << i;
         unpacker.seek_to_segment(i);
 
         inCtx = nullptr;
@@ -160,17 +162,30 @@ AVFormatContext* ConverterThread::createOutputContext(const char* outputPath, AV
 
     for(unsigned int i = 0; i < inCtx->nb_streams; ++i) {
         AVStream* in_stream = inCtx->streams[i];
-        AVCodec* in_codec = avcodec_find_decoder(in_stream->codecpar->codec_id);
 
-        if(!in_codec) {
+        AVCodec* outCodec = nullptr;
+        switch(inCtx->streams[i]->codecpar->codec_type) {
+        case AVMEDIA_TYPE_VIDEO:
+            qDebug() << "AV_CODEC_ID_H264";
+            outCodec = avcodec_find_decoder(AV_CODEC_ID_H264);
+            break;
+        case AVMEDIA_TYPE_AUDIO:
+            qDebug() << "AV_CODEC_ID_AAC";
+            outCodec = avcodec_find_decoder(AV_CODEC_ID_AAC);
+            break;
+        default:
+            outCodec = avcodec_find_decoder(in_stream->codecpar->codec_id);
+            break;
+        }
+        if(!outCodec) {
             curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-            curFile->setStatusMsg("未找到解码器");
+            curFile->setStatusMsg("无法处理的流格式");
             emit fileStatusChanged(curRowIndex);
             avformat_free_context(outCtx);
             return nullptr;
         }
 
-        AVStream* out_stream = avformat_new_stream(outCtx, in_codec);
+        AVStream* out_stream = avformat_new_stream(outCtx, outCodec);
         if(!out_stream) {
             curFile->setStatusCode(InputFileModel::STATUS_FAILED);
             curFile->setStatusMsg("FFMPEG内部错误173");
@@ -179,7 +194,7 @@ AVFormatContext* ConverterThread::createOutputContext(const char* outputPath, AV
             return nullptr;
         }
 
-        AVCodecContext* out_codec_ctx = avcodec_alloc_context3(in_codec);
+        AVCodecContext* out_codec_ctx = avcodec_alloc_context3(outCodec);
         if(!out_codec_ctx) {
             curFile->setStatusCode(InputFileModel::STATUS_FAILED);
             curFile->setStatusMsg("FFMPEG内部错误182");
@@ -201,6 +216,11 @@ AVFormatContext* ConverterThread::createOutputContext(const char* outputPath, AV
             return nullptr;
         }
     }
+
+    ///
+    /// TODO: is it the correct method to deal with AV_NOPTS_VALUE in ts packets ?
+    ///
+    outCtx->oformat->flags |= AVFMT_NOTIMESTAMPS;
 
 //    av_dump_format(outCtx, 0, outputPath.toStdString().c_str(), 1);
 
@@ -227,17 +247,17 @@ int ConverterThread::copyStreams(AVFormatContext* outCtx, AVFormatContext* inCtx
         pkt.pts = av_rescale_q_rnd(pkt.pts,
                                    instream->time_base,
                                    outstream->time_base,
-                                   (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
+                                   (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
         pkt.dts = av_rescale_q_rnd(pkt.dts,
                                    instream->time_base,
                                    outstream->time_base,
-                                   (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
+                                   (AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
         pkt.duration = av_rescale_q(pkt.duration, instream->time_base, outstream->time_base);
         pkt.pos = -1;
 
         if(av_interleaved_write_frame(outCtx, &pkt) < 0) {
             curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-            curFile->setStatusMsg("不支持的输出格式");
+            curFile->setStatusMsg("不支持的输入编码");
             emit fileStatusChanged(curRowIndex);
             av_packet_unref(&pkt);
             return -1;

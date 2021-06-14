@@ -5,6 +5,7 @@
 #include <QTableView>
 #include <QLineEdit>
 #include <QStandardItemModel>
+#include <QDir>
 #include "inputfilemodel.h"
 
 
@@ -13,7 +14,7 @@ class DataModel : public QObject {
 private:
     QTableView* tbvInputList;
     QLineEdit* txtOutputDir;
-    QString outputDir;
+    QDir outputDir;
     QVector<InputFileModel> files;
     QStandardItemModel* inputFileModel;
     int globalStatus;
@@ -27,7 +28,7 @@ public:
 
     void clearInputFile();
 
-    const QString& getOutputDir() const;
+    const QDir& getOutputDir() const;
 
     void setOutputDir(const QString& value);
 
@@ -37,7 +38,9 @@ public:
 
     QVector<InputFileModel>* getInputFiles();
 
-    QString getOutputPath(const QString& inputPath) const;
+    const QString& getTargetFormat() const;
+
+    void setTargetFormat(const QString& value);
 public slots:
     void fileStatusChanged(int rowIndex);
 };

@@ -25,21 +25,6 @@ MainWindow::~MainWindow()
     delete dataModel;
 }
 
-void MainWindow::on_pushButton_clicked()
-{
-    if(dataModel->getGlobalStatus() != 0) {
-        QMessageBox::information(this, "消息", "转码进行中，无法开始新任务");
-        return;
-    }
-    dataModel->setGlobalStatus(1);
-    converterThread = new ConverterThread(nullptr);
-    connect(converterThread, &ConverterThread::fileStatusChanged, dataModel, &DataModel::fileStatusChanged);
-    connect(converterThread, &QThread::finished, this, &MainWindow::conversionFinished);
-    connect(converterThread, &QThread::finished, converterThread, &QObject::deleteLater);
-    connect(converterThread, &QObject::destroyed, this, &MainWindow::conversionDestroyed);
-    converterThread->start();
-}
-
 void MainWindow::on_btnSelectOutputPath_clicked()
 {
     QString outputPath = QFileDialog::getExistingDirectory(this, "选择输出路径");
@@ -48,17 +33,59 @@ void MainWindow::on_btnSelectOutputPath_clicked()
 
 void MainWindow::on_btnAppendFiles_clicked()
 {
+    if(dataModel->getGlobalStatus() != 0) {
+        QMessageBox::information(this, "消息", "转码进行中，无法添加文件");
+        return;
+    }
     QStringList filenames = QFileDialog::getOpenFileNames(this, "选择待转码的文件", "", "QIYI视频(*.qsv)");
     for(QString& filename : filenames) {
         dataModel->appendInputFile(filename);
     }
 }
 
-void MainWindow::conversionFinished() {
-
-}
-
 void MainWindow::conversionDestroyed() {
     converterThread = nullptr;
     dataModel->setGlobalStatus(0);
 }
+
+void MainWindow::on_btnConvert_clicked()
+{
+    if(dataModel->getGlobalStatus() != 0) {
+        QMessageBox::information(this, "消息", "转码进行中，无法开始新任务");
+        return;
+    }
+    dataModel->setGlobalStatus(1);
+    converterThread = new ConverterThread(nullptr);
+    connect(converterThread, &ConverterThread::fileStatusChanged, dataModel, &DataModel::fileStatusChanged);
+    connect(converterThread, &QThread::finished, converterThread, &QObject::deleteLater);
+    connect(converterThread, &QObject::destroyed, this, &MainWindow::conversionDestroyed);
+    converterThread->start();
+}
+
+void MainWindow::on_btnRemoveFile_clicked()
+{
+    if(dataModel->getGlobalStatus() != 0) {
+        QMessageBox::information(this, "消息", "转码进行中，无法移除文件");
+        return;
+    }
+    QModelIndexList selectedRows = ui->tbvInputList->selectionModel()->selectedRows();
+    for(QModelIndex index : selectedRows) {
+        dataModel->removeInputFile(index.row());
+    }
+}
+
+
+void MainWindow::on_btnClearList_clicked()
+{
+    if(dataModel->getGlobalStatus() != 0) {
+        QMessageBox::information(this, "消息", "转码进行中，无法清空列表");
+        return;
+    }
+    dataModel->clearInputFile();
+}
+
+void MainWindow::on_cbxTargetFormat_currentIndexChanged(int index)
+{
+    dataModel->setTargetFormat(ui->cbxTargetFormat->currentText());
+}
+

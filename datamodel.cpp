@@ -4,6 +4,7 @@
 #include <QStandardItemModel>
 #include <QFileInfo>
 #include <QDir>
+#include <QTableView>
 #include "inputfilemodel.h"
 #include "datamodel.h"
 
@@ -14,6 +15,8 @@ DataModel::DataModel(QTableView* tbvInputList, QLineEdit* txtOutputDir) {
     inputFileModel = new QStandardItemModel();
     inputFileModel->setHorizontalHeaderLabels({"文件名", "状态"});
     tbvInputList->setModel(inputFileModel);
+    tbvInputList->setColumnWidth(0, tbvInputList->width() - 100);
+    tbvInputList->setColumnWidth(1, 99);
     globalStatus = 0;
     targetFormat = ".mp4";
 }
@@ -21,7 +24,7 @@ DataModel::DataModel(QTableView* tbvInputList, QLineEdit* txtOutputDir) {
 void DataModel::appendInputFile(const QString& filePath) {
     files.append(InputFileModel(filePath));
     const InputFileModel& file = files.back();
-    inputFileModel->appendRow({new QStandardItem(file.getInputPath()), new QStandardItem(file.getStatusMsg())});
+    inputFileModel->appendRow({new QStandardItem(file.getFileName()), new QStandardItem(file.getStatusMsg())});
 }
 
 void DataModel::removeInputFile(int rowIndex) {
@@ -31,16 +34,15 @@ void DataModel::removeInputFile(int rowIndex) {
 
 void DataModel::clearInputFile() {
     files.clear();
-    inputFileModel->clear();
-    inputFileModel->setHorizontalHeaderLabels({"文件名", "状态"});
+    inputFileModel->removeRows(0, inputFileModel->rowCount());
 }
 
-const QString& DataModel::getOutputDir() const {
+const QDir& DataModel::getOutputDir() const {
     return outputDir;
 }
 
 void DataModel::setOutputDir(const QString& value) {
-    outputDir = value;
+    outputDir.setPath(value);
     txtOutputDir->setText(value);
 }
 
@@ -62,9 +64,10 @@ QVector<InputFileModel>* DataModel::getInputFiles() {
     return &files;
 }
 
-QString DataModel::getOutputPath(const QString& inputPath) const {
-    QFileInfo fileInfo(inputPath);
-    QString baseName = fileInfo.baseName();
-    QDir outDir(outputDir);
-    return outDir.absoluteFilePath(baseName + targetFormat);
+const QString& DataModel::getTargetFormat() const {
+    return targetFormat;
+}
+
+void DataModel::setTargetFormat(const QString& value) {
+    targetFormat = value;
 }

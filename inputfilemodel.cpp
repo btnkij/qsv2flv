@@ -1,13 +1,22 @@
 #include "inputfilemodel.h"
+#include <QFileInfo>
 
-InputFileModel::InputFileModel(const QString& path) {
-    this->inputPath = path;
+InputFileModel::InputFileModel(const QString& path)
+    :info(path) {
     statusCode = STATUS_WAITING;
     progress = 0;
 }
 
-const QString& InputFileModel::getInputPath() const {
-    return inputPath;
+QString InputFileModel::getFilePath() const {
+    return info.absoluteFilePath();
+}
+
+QString InputFileModel::getFileBaseName() const {
+    return info.baseName();
+}
+
+QString InputFileModel::getFileName() const {
+    return info.fileName();
 }
 
 InputFileModel::FileStatus InputFileModel::getStatusCode() const {
