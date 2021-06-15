@@ -66,7 +66,7 @@ void ConverterThread::convertSingleFile() {
 
             if(avformat_write_header(outCtx, nullptr) < 0) {
                 curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-                curFile->setStatusMsg("不支持的输出格式");
+                curFile->setStatusMsg("avformat_write_header");
                 emit fileStatusChanged(curRowIndex);
                 goto label_free_resources;
             }
@@ -85,7 +85,7 @@ void ConverterThread::convertSingleFile() {
 
     if(av_write_trailer(outCtx) < 0) {
         curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-        curFile->setStatusMsg("不支持的输出格式");
+        curFile->setStatusMsg("av_write_trailer");
         emit fileStatusChanged(curRowIndex);
         goto label_free_resources;
     }
@@ -112,14 +112,14 @@ AVFormatContext* ConverterThread::createInputContext(QsvUnpacker* unpacker) {
 
     if(!(buffer = (BYTE*)av_malloc(BUFFER_SIZE))) {
         curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-        curFile->setStatusMsg("FFMPEG内部错误112");
+        curFile->setStatusMsg("av_malloc");
         emit fileStatusChanged(curRowIndex);
         return nullptr;
     }
 
     if(!(inCtx = avformat_alloc_context())) {
         curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-        curFile->setStatusMsg("FFMPEG内部错误119");
+        curFile->setStatusMsg("avformat_alloc_context");
         emit fileStatusChanged(curRowIndex);
         av_free(buffer);
         return nullptr;
@@ -130,7 +130,7 @@ AVFormatContext* ConverterThread::createInputContext(QsvUnpacker* unpacker) {
 
     if(avformat_open_input(&inCtx, "", nullptr, nullptr) < 0) {
         curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-        curFile->setStatusMsg("FFMPEG内部错误128");
+        curFile->setStatusMsg("avformat_open_input");
         emit fileStatusChanged(curRowIndex);
         avformat_close_input(&inCtx);
         return nullptr;
@@ -155,7 +155,7 @@ AVFormatContext* ConverterThread::createOutputContext(const char* outputPath, AV
     avformat_alloc_output_context2(&outCtx, nullptr, nullptr, outputPath);
     if(!outCtx) {
         curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-        curFile->setStatusMsg("FFMPEG内部错误153");
+        curFile->setStatusMsg("avformat_alloc_output_context2");
         emit fileStatusChanged(curRowIndex);
         return nullptr;
     }
@@ -188,7 +188,7 @@ AVFormatContext* ConverterThread::createOutputContext(const char* outputPath, AV
         AVStream* out_stream = avformat_new_stream(outCtx, outCodec);
         if(!out_stream) {
             curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-            curFile->setStatusMsg("FFMPEG内部错误173");
+            curFile->setStatusMsg("avformat_new_stream");
             emit fileStatusChanged(curRowIndex);
             avformat_free_context(outCtx);
             return nullptr;
@@ -197,7 +197,7 @@ AVFormatContext* ConverterThread::createOutputContext(const char* outputPath, AV
         AVCodecContext* out_codec_ctx = avcodec_alloc_context3(outCodec);
         if(!out_codec_ctx) {
             curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-            curFile->setStatusMsg("FFMPEG内部错误182");
+            curFile->setStatusMsg("avcodec_alloc_context3");
             emit fileStatusChanged(curRowIndex);
             avformat_free_context(outCtx);
             return nullptr;
@@ -210,7 +210,7 @@ AVFormatContext* ConverterThread::createOutputContext(const char* outputPath, AV
 
         if(avcodec_parameters_from_context(out_stream->codecpar, out_codec_ctx) < 0) {
             curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-            curFile->setStatusMsg("FFMPEG内部错误195");
+            curFile->setStatusMsg("avcodec_parameters_from_context");
             emit fileStatusChanged(curRowIndex);
             avformat_free_context(outCtx);
             return nullptr;
@@ -254,7 +254,7 @@ int ConverterThread::copyStreams(AVFormatContext* outCtx, AVFormatContext* inCtx
 
         if(av_interleaved_write_frame(outCtx, &pkt) < 0) {
             curFile->setStatusCode(InputFileModel::STATUS_FAILED);
-            curFile->setStatusMsg("不支持的输入编码");
+            curFile->setStatusMsg("av_interleaved_write_frame");
             emit fileStatusChanged(curRowIndex);
             av_packet_unref(&pkt);
             return -1;
