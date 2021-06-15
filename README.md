@@ -3,7 +3,7 @@
 
 
 
-下载地址：测试无误后再放上来
+下载地址：https://github.com/btnkij/qsv2flv/releases/download/beta-test/qsv2flv-beta-x64.exe
 
 ## 对普通用户说的话
 1. 推荐转码为mp4，部分视频转码为flv会失败。
