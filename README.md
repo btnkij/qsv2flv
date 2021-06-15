@@ -1,35 +1,50 @@
-## 计划实现功能
+# qsv2flv
+将iqy的qsv视频格式无损转换为mp4、flv等通用格式的小工具。
+（不要在意标题，很久以前起的了）
 
-~~将.qsv格式的视频转码为.flv格式。~~
+下载地址：测试无误后再放上来
 
-由于qy客户端的更新，本项目的定位为：将qsv格式转换为常用视频格式，不限于flv。
+## 对普通用户说的话
+1. 推荐转码为mp4，部分视频转码为flv会失败。
+**科普**：某些高清片源使用了.h265视频编码格式，不能被无损地封装为flv格式。使用客户端下载的视频中存在错误的帧（正常情况，不影响播放），也不能被封装为flv格式。mp4是网络上应用最广格式，几乎所有播放器都支持，能够适应绝大多数需求。
+2. 遇到转码失败，如果是中文错误提示，很大概率是视频本身的问题。遇到英文错误提示，一定是工具本身的问题。
+3. 由于作者较菜，~~界面很符合程序员的审美，~~工具可能存在bug。如果使用中遇到问题，欢迎提出issue，在不涉及隐私的情况下，可以提供转码失败视频的下载地址，或客户端版本+视频名称+清晰度。
 
+## 对开发者说的话
+作者没有流媒体处理的基础、没有使用ffmpeg的经验，工具可能存在隐藏的bug，甚至有内存泄露。如果你~~忍无可忍~~想要自己修改，可以参考本节。
 
+### 作者的开发环境
+Qt 6.1.1
+MSVC 2019 64-bit 编译器
+ffmpeg 4.4 64-bit
 
-## 闲话
+ffmpeg的头文件放在ffmpeg/include下，静态库放在ffmpeg/lib下。运行时请将动态库拷贝到编译路径下。
 
-由于以前C#版本的代码过于丑陋，且存在部分文件转码失败的情况，该版本将被废弃，见[obsolete](https://github.com/btnkij/qsv2flv/tree/obsolete)分支。当前分支下的代码将使用C++重写。
+### 目录结构
+**ffmpeg/** 存放ffmpeg的库文件。
 
-该项目正在进行中。
+**secret/** 不属于Qt的工程文件。如果想了解转码原理，请[移步于此](https://github.com/btnkij/qsv2flv/tree/main/secret)。
 
-**qsvformat.c** ：已完成。用于格式说明的demo程序。
+**main.cpp** 程序入口，由Qt生成，不需要修改。
 
-**qsvunpack.c** ：基本完成（可编译运行），目前能够提取qsv文件中的flv视频和ts视频，提取的视频能够播放。
+**mainwindow** 处理与前端的交互。
 
-**GUI** ：计划中，整合前面的算法，提供完整的转码流程。
+**datamodel、inputfilemodel** 全局的数据模型，保存前端的输入，供其他模块读取。
 
+**qsvreader** 核心算法，负责提取qsv中分段的流数据。
 
+**converter** 核心算法，负责合并分段视频，封装为目标格式。
 
-## 使用方式
-
-编译
-```bash
-gcc qsvunpack.c -o qsvunpack.exe -O2
+### 待解决的问题
+1. 处理没有设置时间戳的packet
 ```
-
-运行（仅提取分段视频）
-```bash
-qsvunpack.exe input_file_name output_file_name
+Timestamps are unset in a packet for stream 0. This is deprecated and will stop working in the future. Fix your code to set the timestamps properly
+Application provided invalid, non monotonically increasing dts to muxer in stream 0: 806250 >= NOPTS
 ```
-
-暂未提供完整的转码程序。
+目前使用的解决办法：为输出上下文（AVFormatContext）设置AVFMT_NOTIMESTAMPS标记。
+```c++
+// converter.cpp
+// AVFormatContext* createOutputContext(const char* outputPath, AVFormatContext* inCtx);
+outCtx->oformat->flags |= AVFMT_NOTIMESTAMPS;
+```
+2. 大视频的seek速度较慢，可能没有添加索引表。

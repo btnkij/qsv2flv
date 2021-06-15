@@ -165,14 +165,14 @@ AVFormatContext* ConverterThread::createOutputContext(const char* outputPath, AV
 
         AVCodec* outCodec = nullptr;
         switch(inCtx->streams[i]->codecpar->codec_type) {
-        case AVMEDIA_TYPE_VIDEO:
-            qDebug() << "AV_CODEC_ID_H264";
-            outCodec = avcodec_find_decoder(AV_CODEC_ID_H264);
-            break;
-        case AVMEDIA_TYPE_AUDIO:
-            qDebug() << "AV_CODEC_ID_AAC";
-            outCodec = avcodec_find_decoder(AV_CODEC_ID_AAC);
-            break;
+//        case AVMEDIA_TYPE_VIDEO:
+//            qDebug() << "AV_CODEC_ID_H264";
+//            outCodec = avcodec_find_decoder(AV_CODEC_ID_H264);
+//            break;
+//        case AVMEDIA_TYPE_AUDIO:
+//            qDebug() << "AV_CODEC_ID_AAC";
+//            outCodec = avcodec_find_decoder(AV_CODEC_ID_AAC);
+//            break;
         default:
             outCodec = avcodec_find_decoder(in_stream->codecpar->codec_id);
             break;
@@ -217,9 +217,6 @@ AVFormatContext* ConverterThread::createOutputContext(const char* outputPath, AV
         }
     }
 
-    ///
-    /// TODO: is it the correct method to deal with AV_NOPTS_VALUE in ts packets ?
-    ///
     outCtx->oformat->flags |= AVFMT_NOTIMESTAMPS;
 
 //    av_dump_format(outCtx, 0, outputPath.toStdString().c_str(), 1);
