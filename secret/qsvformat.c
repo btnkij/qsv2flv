@@ -21,6 +21,7 @@ typedef uint64_t QWORD;
 #define QSV_ENCRYPTED_SIZE 0x400
 
 #pragma pack(1)
+
 typedef struct {
 	BYTE signature[0xA];
 	DWORD version;
@@ -34,7 +35,6 @@ typedef struct {
 	DWORD nb_indices;
 } QsvHeader;
 
-#pragma pack(1)
 typedef struct {
 	BYTE _codetable[0x10];
 	QWORD segment_offset;
@@ -49,6 +49,8 @@ void decrypt_1(BYTE* buffer, DWORD size) {
 		buffer[i] ^= dict[j];
 	}
 }
+
+#pragma pack()
 
 // decryption algorithm for some segments in qsv version 0x2
 void decrypt_2(BYTE* buffer, DWORD size) {
@@ -104,9 +106,9 @@ int main(int argc, char** argv) {
 	printf("nb_indices: 0x%X\n", qheader.nb_indices);
 
 	printf("\n# indices\n");
-	DWORD index_flags_size = (qheader.nb_indices + 7) >> 3;
-	BYTE* index_flags = (BYTE*)malloc(index_flags_size);
-	fread(index_flags, index_flags_size, 1, fp);
+	DWORD _unknown_flag_size = (qheader.nb_indices + 7) >> 3;
+	BYTE* _unknown_flag = (BYTE*)malloc(_unknown_flag_size);
+	fread(_unknown_flag, _unknown_flag_size, 1, fp);
 	QsvIndex* qindices = (QsvIndex*)malloc(qheader.nb_indices * sizeof(QsvIndex));
 	fread(qindices, sizeof(QsvIndex), qheader.nb_indices, fp);
 	for(int i = 0; i < qheader.nb_indices; ++i) {
@@ -114,12 +116,12 @@ int main(int argc, char** argv) {
 		if(qheader.version == 0x2) {
 			decrypt_2((BYTE*)qindex, sizeof(QsvIndex));
 		}
-		printf("flag: %X", (index_flags[i >> 3] >> (i & 0x7)) & 1);
+		printf("flag: %X", (_unknown_flag[i >> 3] >> (i & 0x7)) & 1);
 		printf(", offset: 0x%X", qindex->segment_offset);
 		printf(", size: 0x%X\n", qindex->segment_size);
 	}
-	free(index_flags);
-	index_flags = NULL;
+	free(_unknown_flag);
+	_unknown_flag = NULL;
 
 	printf("\n# xml\n");
 	BYTE* xml = (BYTE*)malloc(qheader.xml_size);
@@ -136,14 +138,13 @@ int main(int argc, char** argv) {
 		printf("### segment %d\n", i);
 		QsvIndex* qindex = qindices + i;
 		fseek(fp, qindex->segment_offset, SEEK_SET);
-		printf("%X\n", qindex->segment_offset);
 		fread(buffer, QSV_ENCRYPTED_SIZE, 1, fp);
 		if(qheader.version == 0x1) {
 			decrypt_1(buffer, QSV_ENCRYPTED_SIZE);
 		} else if(qheader.version == 0x2) {
 			decrypt_2(buffer, QSV_ENCRYPTED_SIZE);
 		}
-		print_chars(buffer, QSV_ENCRYPTED_SIZE);
+		print_bytes(buffer, QSV_ENCRYPTED_SIZE);
 		printf("\n");
 	}
 	free(qindices);

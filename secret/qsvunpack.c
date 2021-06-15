@@ -1,6 +1,6 @@
 /**
 *
-* description: qsv-to-flv converter
+* description: extract and merge media segments
 * author: btnkij
 *
 * the qsv format is extracted from GeePlayer 5.2.61.5220 (Jan 21, 2020)
@@ -14,7 +14,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <assert.h>
-// #include "yamdi.h"
 
 typedef uint8_t BYTE;
 typedef uint16_t WORD;
@@ -22,12 +21,14 @@ typedef uint32_t DWORD;
 typedef uint64_t QWORD;
 
 #define QSV_SIZE_ENCRYPTED 0x400
+
 #define TS_SIZE_PACKET 0xBC
 #define FLV_SIZE_HEADER 0x9
 #define FLV_SIZE_PREVIOUSTAGSIZE 0x4
 #define FLV_UI24(x) (DWORD)(((*(x)) << 16) + ((*(x + 1)) << 8) + (*(x + 2)))
 
 #pragma pack(1)
+
 typedef struct {
 	BYTE signature[0xA];
 	DWORD version;
@@ -41,12 +42,13 @@ typedef struct {
 	DWORD nb_indices;
 } QsvHeader;
 
-#pragma pack(1)
 typedef struct {
 	BYTE _codetable[0x10];
 	QWORD segment_offset;
 	DWORD segment_size;
 } QsvIndex;
+
+#pragma pack()
 
 // decryption algorithm for some segments in qsv version 0x1
 void decrypt_1(BYTE* buffer, DWORD size) {
@@ -75,6 +77,7 @@ void decrypt_2(BYTE* buffer, DWORD size) {
 }
 
 #pragma pack(1)
+
 typedef struct {
   BYTE tag_type;
   BYTE tag_data_size[3];
@@ -82,6 +85,8 @@ typedef struct {
   BYTE timestamp_extended;
   BYTE stream_id[3];
 } FlvTagHeader;
+
+#pragma pack()
 
 void write_flv_segment(FILE* fp, BYTE* buffer, DWORD size, DWORD is_first) {
 	if(is_first) {
@@ -91,6 +96,7 @@ void write_flv_segment(FILE* fp, BYTE* buffer, DWORD size, DWORD is_first) {
 	DWORD offset = FLV_SIZE_HEADER + FLV_SIZE_PREVIOUSTAGSIZE;
 	// if is_first then skip the script tag
 	// else skip script tag and the following 2 tags whose timestamps are always 0
+	// it's tedious to merge flv metadata. so just ignore it.
 	int skip_count = is_first ? 1 : 3;
 	for(int i = 0; i < skip_count; ++i) {
 		FlvTagHeader* tag = (FlvTagHeader*)(buffer + offset);
@@ -122,19 +128,15 @@ DWORD get_media_type(BYTE* buffer) {
 
 void extract_media(char* input_file, char* output_file) {
 	FILE* fin = fopen(input_file, "rb");
-	assert(fin && "[ERROR] Unable to open input file.");
 	FILE* fout = fopen(output_file, "wb");
-	assert(fout && "[ERROR] Unable to open output file.");
 
 	QsvHeader qheader;
-	assert(fread(&qheader, sizeof(qheader), 1, fin) == 1 && "[ERROR] Unable to read file.");
-	assert((qheader.version == 0x1 || qheader.version == 0x2) && "Invalid version number.");
+	fread(&qheader, sizeof(qheader), 1, fin);
 
 	QsvIndex* qindices = (QsvIndex*)malloc(qheader.nb_indices * sizeof(QsvIndex));
-	assert(qindices && "[ERROR] Unable to allocate memory.");
-	DWORD _index_flag_size = (qheader.nb_indices + 7) >> 3;
-	fseek(fin, _index_flag_size, SEEK_CUR);
-	assert(fread(qindices, sizeof(QsvIndex), qheader.nb_indices, fin) == qheader.nb_indices && "[ERROR] Unable to read file.");
+	DWORD _unknown_flag_size = (qheader.nb_indices + 7) >> 3;
+	fseek(fin, _unknown_flag_size, SEEK_CUR);
+	fread(qindices, sizeof(QsvIndex), qheader.nb_indices, fin);
 	if(qheader.version == 0x2) {
 		for(int i = 0; i < qheader.nb_indices; ++i) {
 			decrypt_2((BYTE*)(qindices + i), sizeof(QsvIndex));
@@ -147,12 +149,12 @@ void extract_media(char* input_file, char* output_file) {
 		max_segment_size = max_segment_size < segment_size ? segment_size : max_segment_size;
 	}
 	BYTE* segment = (BYTE*)malloc(max_segment_size);
-	assert(segment && "[ERROR] Unable to allocate memory.");
+
 	DWORD media_type = -1;
 	for(int i = 0; i < qheader.nb_indices; ++i) {
 		QsvIndex* index = qindices + i;
 		fseek(fin, index->segment_offset, SEEK_SET);
-		assert(fread(segment, index->segment_size, 1, fin) == 1 && "[ERROR] Unable to read file.");
+		fread(segment, index->segment_size, 1, fin);
 		if(qheader.version == 0x1) {
 			decrypt_1(segment, QSV_SIZE_ENCRYPTED);
 		} else if(qheader.version == 0x2) {
@@ -160,7 +162,6 @@ void extract_media(char* input_file, char* output_file) {
 		}
 		if(media_type == -1) {
 			media_type = get_media_type(segment);
-			assert(media_type && "[ERROR] Unsupported media type.");
 		}
 		switch(media_type) {
 		case 1:
@@ -180,13 +181,8 @@ void extract_media(char* input_file, char* output_file) {
 	fclose(fout);
 }
 
-// int inject_metadata(char* input_file, char* output_file) {
-// 	char* argv[] = {"", "-i", input_file, "-o", output_file};
-// 	yamdi_main(sizeof(argv) / sizeof(char*), (char**)argv);
-// }
-
 void help() {
-	printf("Usage: qsv2flv.exe input_file_name output_file_name\n");
+	printf("Usage: qsvunpack.exe input_file_name output_file_name\n");
 }
 
 int main(int argc, char** argv) {
@@ -196,15 +192,6 @@ int main(int argc, char** argv) {
 	}
 	char* input_file = argv[1];
 	char* output_file = argv[2];
-	// char* tmp_suffix = ".tmp";
-	// char* tmp_file = (char*)malloc(strlen(output_file) + strlen(tmp_suffix) + 1);
-	// assert(tmp_file && "[ERROR] Unable to allocate memory.");
-	// strcpy(tmp_file, output_file);
-	// strcat(tmp_file, tmp_suffix);
 	extract_media(input_file, output_file);
-	// inject_metadata(tmp_file, output_file);
-	// assert(remove(tmp_file) == 0 && "[ERROR] Cannot delete temporary file.");
-	// free(tmp_file);
-	// tmp_file = NULL;
 	return 0;
 }
