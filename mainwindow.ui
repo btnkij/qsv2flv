@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="acceptDrops">
-   <bool>false</bool>
+   <bool>true</bool>
   </property>
   <property name="windowTitle">
    <string>qsv2flv - by btnkij</string>
@@ -38,6 +38,9 @@
       <width>351</width>
       <height>31</height>
      </rect>
+    </property>
+    <property name="acceptDrops">
+     <bool>false</bool>
     </property>
     <property name="text">
      <string/>

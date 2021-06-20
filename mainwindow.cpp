@@ -4,6 +4,7 @@
 #include <QFileDialog>
 #include <QThread>
 #include <QMessageBox>
+
 #include "datamodel.h"
 #include "converter.h"
 
@@ -23,6 +24,22 @@ MainWindow::~MainWindow()
 {
     delete ui;
     delete dataModel;
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent *e) {
+    if(e->mimeData()->hasUrls()) {
+        e->acceptProposedAction();
+    }
+}
+
+void MainWindow::dropEvent(QDropEvent *e) {
+    QList<QUrl> urls = e->mimeData()->urls();
+    for(QUrl& url : urls) {
+        QString filePath = url.toLocalFile();
+        if(filePath.endsWith(".qsv")) {
+            dataModel->appendInputFile(filePath);
+        }
+    }
 }
 
 void MainWindow::on_btnSelectOutputPath_clicked()
