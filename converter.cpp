@@ -46,9 +46,9 @@ void ConverterThread::convertSingleFile() {
 
     AVFormatContext* inCtx = nullptr;
     AVFormatContext* outCtx = nullptr;
+    AVDictionary* outDict = nullptr;
 
     for(int i = 0; i < unpacker.get_nb_indices(); ++i) {
-//        qDebug() << "segment" << i;
         unpacker.seek_to_segment(i);
 
         inCtx = nullptr;
@@ -64,7 +64,8 @@ void ConverterThread::convertSingleFile() {
                 goto label_free_resources;
             }
 
-            if(avformat_write_header(outCtx, nullptr) < 0) {
+            av_dict_set(&outDict, "movflags", "faststart", 0);
+            if(avformat_write_header(outCtx, &outDict) < 0) {
                 curFile->setStatusCode(InputFileModel::STATUS_FAILED);
                 curFile->setStatusMsg("avformat_write_header");
                 emit fileStatusChanged(curRowIndex);
@@ -83,12 +84,14 @@ void ConverterThread::convertSingleFile() {
         inCtx = nullptr;
     }
 
+    qDebug() << "second pass";
     if(av_write_trailer(outCtx) < 0) {
         curFile->setStatusCode(InputFileModel::STATUS_FAILED);
         curFile->setStatusMsg("av_write_trailer");
         emit fileStatusChanged(curRowIndex);
         goto label_free_resources;
     }
+    qDebug() << "done";
 
     curFile->setStatusCode(InputFileModel::STATUS_SUCCEEDED);
     emit fileStatusChanged(curRowIndex);
@@ -102,6 +105,9 @@ label_free_resources:
             avio_close(outCtx->pb);
         }
         avformat_free_context(outCtx);
+    }
+    if(outDict) {
+        av_dict_free(&outDict);
     }
 }
 
